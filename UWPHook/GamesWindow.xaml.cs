@@ -207,6 +207,7 @@ namespace UWPHook
             try
             {
                 result = await ExportGames(Apps.Entries.Where(app => app.Selected));
+                RefreshSteamStatuses();
 
                 msg = "Your apps were successfuly exported!";
                 if (result)
@@ -865,6 +866,7 @@ namespace UWPHook
                 }
 
                 bool changed = await ExportGames(xboxGames, installedAppAumids);
+                RefreshSteamStatuses();
 
                 if (showCompletion)
                 {
@@ -941,12 +943,6 @@ namespace UWPHook
 
             listGames.ItemsSource = Apps.Entries;
 
-            if (listGames.Columns.Count > 3)
-            {
-                listGames.Columns[2].IsReadOnly = true;
-                listGames.Columns[3].IsReadOnly = true;
-            }
-
             grid.IsEnabled = true;
             progressBar.Visibility = Visibility.Collapsed;
             label.Content = "Installed Apps";
@@ -984,6 +980,7 @@ namespace UWPHook
                 //Rejoin them in the original list, but putting them into last
                 installedApps = installedApps.Union(nameNotFound).ToList<String>();
 
+                HashSet<string> steamAppAumids = GetSteamAppAumids();
                 List<AppEntry> entries = new List<AppEntry>();
 
                 foreach (var app in installedApps)
@@ -1002,7 +999,18 @@ namespace UWPHook
                         //We get the default square tile to find where the app stores it's icons, then we resolve which one is the widest
                         string logosPath = Path.GetDirectoryName(values[1]);
                         bool isXboxGame = values.Length >= 5 && bool.TryParse(values[4], out bool parsedIsXboxGame) && parsedIsXboxGame;
-                        entries.Add(new AppEntry() { Name = values[0], Executable = values[3], IconPath = logosPath, Aumid = values[2], Selected = false, IsXboxGame = isXboxGame });
+                        var entry = new AppEntry()
+                        {
+                            Name = values[0],
+                            Executable = values[3],
+                            IconPath = logosPath,
+                            Aumid = values[2],
+                            Selected = false,
+                            IsXboxGame = isXboxGame,
+                            AddedToSteam = steamAppAumids.Contains(values[2])
+                        };
+                        entry.Icon = entry.widestSquareIcon();
+                        entries.Add(entry);
                     }
                 }
 
@@ -1012,6 +1020,122 @@ namespace UWPHook
             {
                 Log.Error(ex.Message);
                 throw;
+            }
+        }
+
+        private HashSet<string> GetSteamAppAumids()
+        {
+            var aumids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string? steamFolder = SteamManager.GetSteamFolder();
+
+            if (String.IsNullOrWhiteSpace(steamFolder)
+                || !Directory.Exists(steamFolder)
+                || !Directory.Exists(Path.Combine(steamFolder, "userdata")))
+            {
+                return aumids;
+            }
+
+            foreach (string user in SteamManager.GetUsers(steamFolder))
+            {
+                try
+                {
+                    foreach (VDFEntry shortcut in SteamManager.ReadShortcuts(user))
+                    {
+                        string? aumid = GetShortcutAumid(shortcut);
+                        if (!String.IsNullOrWhiteSpace(aumid))
+                        {
+                            aumids.Add(aumid);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Could not read Steam shortcuts for {SteamUser}", user);
+                }
+            }
+
+            return aumids;
+        }
+
+        private void RefreshSteamStatuses()
+        {
+            HashSet<string> steamAppAumids = GetSteamAppAumids();
+            foreach (AppEntry app in Apps.Entries)
+            {
+                app.AddedToSteam = steamAppAumids.Contains(app.Aumid);
+            }
+        }
+
+        private static string? GetShortcutAumid(VDFEntry shortcut)
+        {
+            if (String.IsNullOrWhiteSpace(shortcut.LaunchOptions))
+            {
+                return null;
+            }
+
+            string? aumid = shortcut.LaunchOptions
+                .Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault()
+                ?.Trim('"');
+
+            return !String.IsNullOrWhiteSpace(aumid) && aumid.Contains("!")
+                ? aumid
+                : null;
+        }
+
+        private void ListGames_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        {
+            if (e.PropertyName == nameof(AppEntry.Icon) || e.PropertyName == nameof(AppEntry.IconPath))
+            {
+                e.Cancel = true;
+            }
+            else if (e.PropertyName == nameof(AppEntry.Selected))
+            {
+                e.Column.DisplayIndex = 0;
+            }
+            else if (e.PropertyName == nameof(AppEntry.Executable) || e.PropertyName == nameof(AppEntry.Aumid))
+            {
+                e.Column.IsReadOnly = true;
+            }
+            else if (e.PropertyName == nameof(AppEntry.AddedToSteam))
+            {
+                e.Cancel = true;
+            }
+            else if (e.PropertyName == nameof(AppEntry.SteamStatus))
+            {
+                e.Column.Header = "Added to Steam";
+                e.Column.IsReadOnly = true;
+                e.Column.DisplayIndex = 3;
+            }
+        }
+
+        private void ListGames_LoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e)
+        {
+            e.Row.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                foreach (System.Windows.Controls.TextBlock text in FindVisualChildren<System.Windows.Controls.TextBlock>(e.Row))
+                {
+                    text.Padding = new Thickness(0, 7, 0, 0);
+                }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private static IEnumerable<T> FindVisualChildren<T>(System.Windows.DependencyObject parent)
+            where T : System.Windows.DependencyObject
+        {
+            int childCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childCount; i++)
+            {
+                System.Windows.DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T match)
+                {
+                    yield return match;
+                }
+
+                foreach (T descendant in FindVisualChildren<T>(child))
+                {
+                    yield return descendant;
+                }
             }
         }
 

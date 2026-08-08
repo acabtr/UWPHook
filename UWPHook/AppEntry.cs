@@ -78,6 +78,27 @@ namespace UWPHook
             set { _icon_path = value; }
         }
 
+        private bool _addedToSteam;
+        /// <summary>
+        /// Gets or sets whether this application already has a Steam shortcut.
+        /// </summary>
+        public bool AddedToSteam
+        {
+            get { return _addedToSteam; }
+            set
+            {
+                if (_addedToSteam == value) return;
+                _addedToSteam = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SteamStatus));
+            }
+        }
+
+        public string SteamStatus
+        {
+            get { return AddedToSteam ? "Added" : "Not added"; }
+        }
+
         public bool IsXboxGame;
 
         public string widestSquareIcon()
@@ -103,27 +124,22 @@ namespace UWPHook
             //Decide which is the largest
             foreach (string image in images)
             {
-                Image icon = null;
-
                 //Try to load the image, if it's a invalid file, skip it
                 try
                 {
-                    icon = Image.FromFile(image);
+                    using (Image icon = Image.FromFile(image))
+                    {
+                        //UWP apps usually store live tile images inside the same directory
+                        //Let's check if the image is square for use as icon on Steam and pick the largest one
+                        if (icon.Width == icon.Height && icon.Size.Height > size.Height)
+                        {
+                            size = icon.Size;
+                            result = image;
+                        }
+                    }
                 }
                 catch (System.Exception)
                 {
-
-                }
-
-                if (icon != null)
-                {
-                    //UWP apps usually store live tile images inside the same directory
-                    //Let's check if the image is square for use as icon on Steam and pick the largest one
-                    if (icon.Width == icon.Height && (icon.Size.Height > size.Height))
-                    {
-                        size = icon.Size;
-                        result = image;
-                    }
                 }
             }
 
