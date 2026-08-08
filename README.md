@@ -16,6 +16,8 @@ Click on the 🔄 to load installed UWP Apps, we will find every UWP app and Xbo
 
 Select every app you want to add to Steam, you can change the name by double clicking the "name" collumn, press "Export selected apps to Steam" and 🎉, every app you selected will be added to Steam.
 
+To organize exported games automatically, enter comma-separated collection names under **Settings → Export to collections**. UWPHook updates Steam's modern cloud-backed collection data and reuses an existing collection when its name matches.
+
 ![](https://i.imgur.com/on46CMQ.png)
 
 Close UWPHook, restart Steam if prompted, click play on your UWP game, and Steam will show your current game on your status as long as you are playing it!

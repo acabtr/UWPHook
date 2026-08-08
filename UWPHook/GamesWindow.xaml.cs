@@ -201,25 +201,17 @@ namespace UWPHook
             grid.IsEnabled = false;
             progressBar.Visibility = Visibility.Visible;
 
-            bool result = false, restartSteam = true;
+            bool result = false;
             string msg = String.Empty;
 
             try
             {
                 result = await ExportGames(Apps.Entries.Where(app => app.Selected));
-                if (result)
-                {
-                    await RestartSteam(restartSteam);
-                }
 
                 msg = "Your apps were successfuly exported!";
-                if (!restartSteam)
+                if (result)
                 {
-                    msg += " Please restart Steam in order to see them.";
-                }
-                else if (result)
-                {
-                    msg += " Steam has been restarted.";
+                    msg += " Steam data and collections were updated.";
                 }
 
             }
@@ -422,11 +414,10 @@ namespace UWPHook
         /// <summary>
         /// Main Task to export the selected games to steam
         /// </summary>
-        /// <param name="restartSteam"></param>
         /// <returns></returns>
         private async Task<bool> ExportGames(IEnumerable<AppEntry> appsToExport, ISet<string>? installedAppAumids = null)
         {
-            string[] tags = Settings.Default.Tags.Split(',');
+            string[] tags = SteamCollectionManager.ParseCollectionNames(Settings.Default.Tags);
             string steam_folder = SteamManager.GetSteamFolder();
             bool shortcutsChanged = false;
 
@@ -457,29 +448,33 @@ namespace UWPHook
 
                 await Task.WhenAll(gridImagesDownloadTasks);
 
-                // Export the selected apps and the downloaded images to each user
-                // in the steam folder by modifying it's VDF file
-                foreach (var user in users)
+                string? steamExeToRestart = await StopSteam();
+                try
                 {
-                    try
+                    // Export the selected apps and the downloaded images to each user
+                    // while Steam is stopped so its in-memory state cannot overwrite them.
+                    foreach (var user in users)
                     {
-                        VDFEntry[] shortcuts = new VDFEntry[0];
                         try
                         {
-                            shortcuts = SteamManager.ReadShortcuts(user);
-                        }
-                        catch (Exception ex)
-                        {
-                            //If it's a short VDF, let's just overwrite it
-                            if (ex.GetType() != typeof(VDFTooShortException))
+                            VDFEntry[] shortcuts = new VDFEntry[0];
+                            try
                             {
-                                Log.Error("Error: Program failed to load existing Steam shortcuts." + Environment.NewLine + ex.Message);
-                                throw new Exception("Error: Program failed to load existing Steam shortcuts." + Environment.NewLine + ex.Message);
+                                shortcuts = SteamManager.ReadShortcuts(user);
                             }
-                        }
+                            catch (Exception ex)
+                            {
+                                //If it's a short VDF, let's just overwrite it
+                                if (ex.GetType() != typeof(VDFTooShortException))
+                                {
+                                    Log.Error("Error: Program failed to load existing Steam shortcuts." + Environment.NewLine + ex.Message);
+                                    throw new Exception("Error: Program failed to load existing Steam shortcuts." + Environment.NewLine + ex.Message);
+                                }
+                            }
 
-                        if (shortcuts != null)
-                        {
+                            if (shortcuts != null)
+                            {
+                            VDFEntry[] originalShortcuts = shortcuts.ToArray();
                             bool userShortcutsChanged = false;
 
                             if (installedAppAumids != null)
@@ -573,52 +568,70 @@ namespace UWPHook
                                 }
                             }
 
-                            if (!userShortcutsChanged)
-                            {
-                                continue;
-                            }
+                            var previousUWPHookShortcuts = originalShortcuts
+                                .Where(shortcut => IsUWPHookShortcut(shortcut, exePath))
+                                .ToArray();
+                            var currentUWPHookShortcuts = shortcuts
+                                .Where(shortcut => IsUWPHookShortcut(shortcut, exePath))
+                                .ToArray();
 
-                            try
+                            if (userShortcutsChanged)
                             {
-                                if (!Directory.Exists(user + @"\\config\\"))
+                                try
                                 {
-                                    Directory.CreateDirectory(user + @"\\config\\");
+                                    if (!Directory.Exists(user + @"\\config\\"))
+                                    {
+                                        Directory.CreateDirectory(user + @"\\config\\");
+                                    }
+
+                                    BackupShortcutsVDF(user, @"\\config\\shortcuts.vdf");
+
+                                    //Write the file with all the shortcuts
+                                    File.WriteAllBytes(user + @"\\config\\shortcuts.vdf", VDFSerializer.Serialize(shortcuts));
+                                    Log.Debug("Shortcuts written to " + user + @"\\config\\shortcuts.vdf");
                                 }
-
-                                BackupShortcutsVDF(user, @"\\config\\shortcuts.vdf");
-
-                                //Write the file with all the shortcuts
-                                File.WriteAllBytes(user + @"\\config\\shortcuts.vdf", VDFSerializer.Serialize(shortcuts));
-                                shortcutsChanged = true;
-                                Log.Debug("Shortcuts written to " + user + @"\\config\\shortcuts.vdf");
+                                catch (Exception ex)
+                                {
+                                    Log.Error("Error: Program failed while trying to write your Steam shortcuts" + Environment.NewLine + ex.InnerException + ex.StackTrace);
+                                    throw new Exception("Error: Program failed while trying to write your Steam shortcuts" + Environment.NewLine + ex.Message);
+                                }
                             }
-                            catch (Exception ex)
-                            {
-                                Log.Error("Error: Program failed while trying to write your Steam shortcuts" + Environment.NewLine + ex.InnerException + ex.StackTrace);
-                                throw new Exception("Error: Program failed while trying to write your Steam shortcuts" + Environment.NewLine + ex.Message);
+
+                            bool collectionsChanged = SteamCollectionManager.Synchronize(
+                                user,
+                                tags,
+                                currentUWPHookShortcuts.Select(shortcut => shortcut.appid),
+                                previousUWPHookShortcuts.Select(shortcut => shortcut.appid),
+                                previousUWPHookShortcuts.SelectMany(shortcut => shortcut.Tags ?? Array.Empty<string>()));
+
+                            shortcutsChanged |= userShortcutsChanged || collectionsChanged;
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            Log.Error("Error: Program failed exporting your games:" + Environment.NewLine + ex.Message + ex.StackTrace);
+                            MessageBox.Show("Error: Program failed exporting your games:" + Environment.NewLine + ex.Message + ex.StackTrace);
+                        }
                     }
-                    catch (Exception ex)
+
+                    if (gridImagesDownloadTasks.Count > 0)
                     {
-                        Log.Error("Error: Program failed exporting your games:" + Environment.NewLine + ex.Message + ex.StackTrace);
-                        MessageBox.Show("Error: Program failed exporting your games:" + Environment.NewLine + ex.Message + ex.StackTrace);
+                        await Task.WhenAll(gridImagesDownloadTasks);
+
+                        await Task.Run(() =>
+                        {
+                            foreach (var user in users)
+                            {
+                                CopyTempGridImagesToSteamUser(user);
+                            }
+
+                            RemoveTempGridImages();
+                        });
                     }
                 }
-
-                if (gridImagesDownloadTasks.Count > 0)
+                finally
                 {
-                    await Task.WhenAll(gridImagesDownloadTasks);
-
-                    await Task.Run(() =>
-                    {
-                        foreach (var user in users)
-                        {
-                            CopyTempGridImagesToSteamUser(user);
-                        }
-
-                        RemoveTempGridImages();
-                    });
+                    StartSteam(steamExeToRestart);
                 }
             }
 
@@ -641,6 +654,11 @@ namespace UWPHook
             return !String.IsNullOrWhiteSpace(aumid)
                 && aumid.Contains("!")
                 && !installedAppAumids.Contains(aumid);
+        }
+
+        private bool IsUWPHookShortcut(VDFEntry shortcut, string uwpHookExePath)
+        {
+            return String.Equals(shortcut.Exe?.Trim('"'), uwpHookExePath.Trim('"'), StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsSameSteamShortcut(VDFEntry existing, VDFEntry updated)
@@ -728,54 +746,58 @@ namespace UWPHook
         }
 
         /// <summary>
-        /// Restarts the Steam.exe process
+        /// Gracefully stops Steam before editing its on-disk state.
         /// </summary>
-        /// <param name="restartSteam"></param>
-        /// <returns></returns>
-        private async Task<bool> RestartSteam(bool restartSteam)
+        /// <returns>The Steam executable to restart, or null when Steam was not running.</returns>
+        private async Task<string?> StopSteam()
         {
-            Func<Process> getSteam = () => Process.GetProcessesByName("steam").SingleOrDefault();
+            Func<Process?> getSteam = () => Process.GetProcessesByName("steam").FirstOrDefault();
             Process steam = getSteam();
 
-            if (steam != null)
+            if (steam == null)
             {
-                string steamExe = steam.MainModule.FileName;
-
-                //we always ask politely
-                Log.Debug("Requesting Steam shutdown");
-                Process.Start(steamExe, "-exitsteam");
-
-                bool restarted = false;
-                Stopwatch watch = new Stopwatch();
-                watch.Start();
-
-                //give it N seconds to sort itself out
-                int waitSeconds = 8;
-                while (!restarted || watch.Elapsed.TotalSeconds < waitSeconds)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(0.5f));
-                    if (getSteam() == null)
-                    {
-                        Log.Debug("Restarting Steam");
-                        Process.Start(steamExe);
-                        restarted = true;
-                        break;
-                    }
-                }
-
-                if (!restarted)
-                {
-                    Log.Debug("Steam instance not restarted");
-                    MessageBox.Show("Failed to restart Steam, please launch it manually", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return false;
-                }
-            }
-            else
-            {
-                Log.Debug("Steam instance not found to be restarted");
+                Log.Debug("Steam instance not found; no restart will be needed.");
+                return null;
             }
 
-            return true;
+            string steamExe = steam.MainModule.FileName;
+
+            Log.Debug("Requesting Steam shutdown before updating shortcuts and collections");
+            Process.Start(steamExe, "-exitsteam");
+
+            Stopwatch watch = Stopwatch.StartNew();
+            const int waitSeconds = 15;
+            while (watch.Elapsed.TotalSeconds < waitSeconds)
+            {
+                if (getSteam() == null)
+                {
+                    Log.Debug("Steam stopped successfully");
+                    return steamExe;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
+
+            throw new TaskCanceledException("Steam did not close within 15 seconds. No shortcuts or collections were changed.");
+        }
+
+        private void StartSteam(string? steamExe)
+        {
+            if (String.IsNullOrWhiteSpace(steamExe))
+            {
+                return;
+            }
+
+            try
+            {
+                Log.Debug("Restarting Steam");
+                Process.Start(steamExe);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(exception, "Steam could not be restarted");
+                MessageBox.Show("Steam data was updated, but Steam could not be restarted. Please launch it manually.", "UWPHook", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         public static void ClearAllShortcuts()
@@ -843,10 +865,6 @@ namespace UWPHook
                 }
 
                 bool changed = await ExportGames(xboxGames, installedAppAumids);
-                if (changed)
-                {
-                    await RestartSteam(true);
-                }
 
                 if (showCompletion)
                 {

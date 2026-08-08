@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Management;
@@ -41,7 +42,6 @@ namespace UWPHook
             type_comboBox.SelectedIndex = Properties.Settings.Default.SelectedSteamGridDB_Type;
             nfsw_comboBox.SelectedIndex = Properties.Settings.Default.SelectedSteamGridDB_nfsw;
             humor_comboBox.SelectedIndex = Properties.Settings.Default.SelectedSteamGridDB_Humor;
-            tags_textBox.Text = Properties.Settings.Default.Tags;
         }
 
 #pragma warning disable CA1416 // Validate platform compatibility
@@ -77,6 +77,8 @@ namespace UWPHook
 
         private void saveButton_Click(object sender, RoutedEventArgs e)
         {
+            // Save this first so an unrelated invalid control cannot discard collection names.
+            Properties.Settings.Default.Tags = tags_textBox.Text;
             Properties.Settings.Default.ChangeLanguage = (bool)language_toggle.IsChecked;
             Properties.Settings.Default.TargetLanguage = cultures_comboBox.SelectedItem.ToString();
             Properties.Settings.Default.Seconds = Int32.Parse(seconds_comboBox.SelectedItem.ToString().Substring(0, 1));
@@ -89,10 +91,15 @@ namespace UWPHook
             Properties.Settings.Default.SelectedSteamGridDB_Type = type_comboBox.SelectedIndex;
             Properties.Settings.Default.SelectedSteamGridDB_nfsw = nfsw_comboBox.SelectedIndex;
             Properties.Settings.Default.SelectedSteamGridDB_Humor = humor_comboBox.SelectedIndex;
-            Properties.Settings.Default.Tags = tags_textBox.Text;
             Properties.Settings.Default.Save();
             GamesWindow.SetLogLevel();
             this.Close();
+        }
+
+        private void SettingsWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            Properties.Settings.Default.Tags = tags_textBox.Text;
+            Properties.Settings.Default.Save();
         }
 
         private void Chip_Click(object sender, RoutedEventArgs e)
