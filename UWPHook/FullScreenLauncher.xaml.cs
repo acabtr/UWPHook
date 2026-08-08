@@ -39,7 +39,7 @@ namespace UWPHook
 
         private void Chip2_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Process.Start("https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9YPV3FHEFRAUQ");
+            System.Diagnostics.Process.Start("https://github.com/acabtr/UWPHook");
         }
 
         string GetLauncherText()
@@ -64,7 +64,7 @@ namespace UWPHook
             }
             else if (n > 40 && n <= 50)
             {
-                return "Don't forget to check for updates at github.com/brianlima";
+                return "Check for fork updates at github.com/acabtr/UWPHook";
             }
             else
             {

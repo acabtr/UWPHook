@@ -33,7 +33,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="Tags" Type="System.String" Scope="User">
-      <Value Profile="(Default)">READY TO PLAY,XBOX</Value>
+      <Value Profile="(Default)">XBOX</Value>
     </Setting>
     <Setting Name="SelectedLogLevel" Type="System.String" Scope="User">
       <Value Profile="(Default)">0</Value>

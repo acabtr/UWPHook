@@ -8,11 +8,11 @@ using System.Windows;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("UWPHook")]
-[assembly: AssemblyDescription("Add your UWP games and apps to Steam!")]
+[assembly: AssemblyDescription("Maintained fork for adding UWP games and apps to Steam")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Briano")]
+[assembly: AssemblyCompany("UWPHook contributors")]
 [assembly: AssemblyProduct("UWPHook")]
-[assembly: AssemblyCopyright("Copyright Brian Lima © 2020 2021 2022 2023 2024")]
+[assembly: AssemblyCopyright("Copyright © 2020–2024 Brian Lima; fork contributors © 2026")]
 [assembly: AssemblyTrademark("Briano")]
 [assembly: AssemblyCulture("")]
 

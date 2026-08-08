@@ -19,7 +19,7 @@ namespace UWPHook
         {
             InitializeComponent();
 
-            Title = "UWPHook version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            Title = "UWPHook fork — version " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             cultures_comboBox.ItemsSource = CultureInfo.GetCultures(CultureTypes.AllCultures).Select(c => c.TextInfo.CultureName);
             cultures_comboBox.SelectedItem = string.IsNullOrEmpty(Settings.Default.TargetLanguage) ? CultureInfo.CurrentCulture.TextInfo.CultureName : Properties.Settings.Default.TargetLanguage;
@@ -102,24 +102,19 @@ namespace UWPHook
             Properties.Settings.Default.Save();
         }
 
-        private void Chip_Click(object sender, RoutedEventArgs e)
-        {
-            OpenUrl("http://twitter.com/brianostorm");
-        }
-
         private void Chip1_Click(object sender, RoutedEventArgs e)
         {
-            OpenUrl("http://github.com/brianlima");
+            OpenUrl("https://github.com/acabtr/UWPHook");
         }
 
         private void Chip2_Click(object sender, RoutedEventArgs e)
         {
-            OpenUrl("https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9YPV3FHEFRAUQ");
+            OpenUrl("https://github.com/BrianLima/UWPHook");
         }
 
         private void update_button_Click(object sender, RoutedEventArgs e)
         {
-            OpenUrl("https://github.com/BrianLima/UWPHook/releases");
+            OpenUrl("https://github.com/acabtr/UWPHook/releases");
         }
 
         private void help_button_Click(object sender, RoutedEventArgs e)

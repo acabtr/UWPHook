@@ -1,14 +1,17 @@
 # UWPHook
 
-[![](http://imgur.com/gWwR02D.png)](https://briano.dev/UWPHook/)
+[![](http://imgur.com/gWwR02D.png)](https://github.com/acabtr/UWPHook)
 
 Small project to link UWP games and XboxGamePass to Steam
+
+> [!NOTE]
+> This repository is a maintained fork of [BrianLima/UWPHook](https://github.com/BrianLima/UWPHook). It preserves the original project while adding fixes and support for newer Steam behavior. Please report fork-specific issues and download builds from [acabtr/UWPHook](https://github.com/acabtr/UWPHook).
 
 If you want to add Windows Store or Xbox Game Pass Games to Steam, you need to do a bit of a workaround because Steam can't see UWP apps, and there's a chance Steam won't show it on your "Currently playing" status. This app aims to simplify a little bit the process where it is possible by automating the scripting and launching of Windows Store apps and Xbox Game Pass games.
 
 # To add UWP or XGP games to Steam #
 
-[Download the latest version of UWPHook](https://github.com/BrianLima/UWPHook/releases) and store it somewhere on your PC.
+[Download the latest version of this UWPHook fork](https://github.com/acabtr/UWPHook/releases) and store it somewhere on your PC.
 
 Click on the 🔄 to load installed UWP Apps, we will find every UWP app and Xbox Game Pass game installed on your PC.
 
@@ -74,11 +77,6 @@ The installation consists of zipping the application and creating some of the pa
 
 # About
 
-This software is open-source under the MIT License.
-It will mostly likely break withouth any heads up, since any API, file format, script and many other things used by it may be changed by Valve or Microsoft withouth prior notice.
+This is a maintained fork of [the original UWPHook project](https://github.com/BrianLima/UWPHook), created by Brian Lima and improved by its [original contributors](https://github.com/BrianLima/UWPHook/graphs/contributors) and [fork contributors](https://github.com/acabtr/UWPHook/graphs/contributors). Fork-specific development and releases are hosted at [acabtr/UWPHook](https://github.com/acabtr/UWPHook).
 
-I am not responsible if anything breaks.
-
-If you like what i did with it and want to suport me, you can cheer me up at my [Twitter](http://www.twitter.com/brianostorm "Twitter") or [pay me a coffee via Paypal, it will help me to continue to build amazing open source tools for you!"](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9YPV3FHEFRAUQ)
-
-Thanks for your support, and game on!
+UWPHook is open-source software distributed under the [MIT License](License.md). It depends on APIs and file formats controlled by Valve and Microsoft, so future platform changes may affect it without notice. Use it at your own risk.
