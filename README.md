@@ -70,8 +70,13 @@ Special thanks to @FusRoDah061 for implementing the base feature!
 
 ## Installer 
 
-The installer is built with [NSIS](https://nsis.sourceforge.io/Download), just run the script `UWPHook.nsi` and things **should** work. Modify any hardcoded paths to suit your setup.
-The installation consists of zipping the application and creating some of the paths for the user, since the application is mostly static/dynamic and does not depend a lot on where it is installed, the installer is made for convenience.
+The release installer is built with [NSIS](https://nsis.sourceforge.io/Download). After installing NSIS, run this command from the repository root:
+
+```powershell
+.\build-installer.ps1
+```
+
+The script publishes a self-contained .NET 8 `win-x64` application, reads its version, packages it, and writes the installer to `artifacts`. Set the release version in `UWPHook/Properties/AssemblyInfo.cs` before building a new release.
 
 ----------
 

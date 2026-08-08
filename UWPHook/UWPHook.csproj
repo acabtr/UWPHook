@@ -12,6 +12,7 @@
 		<ApplicationIcon>Resources\hook2.ico</ApplicationIcon>
 		<PublishSingleFile>true</PublishSingleFile>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
 		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
 	</PropertyGroup>
 
