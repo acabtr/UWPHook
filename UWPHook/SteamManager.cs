@@ -85,14 +85,7 @@ namespace UWPHook
         /// <param name="vdfPath">The full path to which to write the shortcuts, including filename</param>
         public static void WriteShortcuts(VDFEntry[] vdf, string vdfPath)
         {
-            try
-            {
-                File.WriteAllBytes(vdfPath, VDFToBytes(vdf));
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            File.WriteAllBytes(vdfPath, VDFToBytes(vdf));
         }
 
         /// <summary>

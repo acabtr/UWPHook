@@ -27,6 +27,7 @@ Name "${APP_NAME}"
 Caption "${APP_NAME} Setup"
 OutFile "${INSTALLER_OUT}"
 InstallDir "$LOCALAPPDATA\Programs\${APP_NAME}"
+InstallDirRegKey ${REG_ROOT} "${REG_APP_PATH}" ""
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "${APP_NAME}"

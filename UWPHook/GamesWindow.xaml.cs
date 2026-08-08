@@ -547,7 +547,8 @@ namespace UWPHook
                                 {
                                     Log.Verbose(shortcuts[i].ToString());
 
-                                    if (shortcuts[i].AppName == app.Name && shortcuts[i].Exe == exePath)
+                                    if (IsUWPHookShortcut(shortcuts[i], exePath)
+                                        && String.Equals(GetShortcutAumid(shortcuts[i]), app.Aumid, StringComparison.OrdinalIgnoreCase))
                                     {
                                         shortcutAlreadyExists = true;
                                         newApp.Index = shortcuts[i].Index;
@@ -642,8 +643,7 @@ namespace UWPHook
 
         private bool IsUninstalledUWPHookApp(VDFEntry shortcut, string uwpHookExePath, ISet<string> installedAppAumids)
         {
-            if (!String.Equals(shortcut.Exe, uwpHookExePath, StringComparison.OrdinalIgnoreCase)
-                || String.IsNullOrWhiteSpace(shortcut.LaunchOptions))
+            if (!IsUWPHookShortcut(shortcut, uwpHookExePath))
             {
                 return false;
             }
@@ -660,7 +660,18 @@ namespace UWPHook
 
         private bool IsUWPHookShortcut(VDFEntry shortcut, string uwpHookExePath)
         {
-            return String.Equals(shortcut.Exe?.Trim('"'), uwpHookExePath.Trim('"'), StringComparison.OrdinalIgnoreCase);
+            string? shortcutExe = shortcut.Exe?.Trim('"');
+            bool pointsToCurrentExecutable = String.Equals(
+                shortcutExe,
+                uwpHookExePath.Trim('"'),
+                StringComparison.OrdinalIgnoreCase);
+            bool pointsToUWPHookExecutable = String.Equals(
+                Path.GetFileName(shortcutExe),
+                "UWPHook.exe",
+                StringComparison.OrdinalIgnoreCase);
+
+            return (pointsToCurrentExecutable || pointsToUWPHookExecutable)
+                && GetShortcutAumid(shortcut) != null;
         }
 
         private bool IsSameSteamShortcut(VDFEntry existing, VDFEntry updated)
@@ -741,7 +752,7 @@ namespace UWPHook
             catch (System.IO.IOException e)
             {
                 Log.Warning(e, "Could not copy icon " + app.Icon);
-                throw e;
+                throw;
             }
 
             return dest_file;

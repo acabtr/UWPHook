@@ -55,6 +55,9 @@ if (-not (Test-Path -LiteralPath $installer)) {
 
 $file = Get-Item -LiteralPath $installer
 $hash = Get-FileHash -LiteralPath $installer -Algorithm SHA256
+$checksumFile = "$installer.sha256"
+"$($hash.Hash)  $($file.Name)" | Set-Content -LiteralPath $checksumFile -Encoding ascii
 Write-Output "Installer: $($file.FullName)"
 Write-Output "Size: $($file.Length) bytes"
 Write-Output "SHA256: $($hash.Hash)"
+Write-Output "Checksum: $checksumFile"
