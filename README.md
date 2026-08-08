@@ -59,9 +59,8 @@ Special thanks to @FusRoDah061 for implementing the base feature!
 # Building
 
 - Clone project or forked project.
-- Install Visual Studio 2022 with .NET Framework 4.8.
-- Install [SharpSteam by BrianLima](https://github.com/BrianLima/SharpSteam/releases/) and [VDFParser](https://github.com/brianlima/VDFParser) and build.
-- If the project asks for the references for VDFParser and Sharpsteam, point it to the most recent build.
+- Install Visual Studio 2022 with the .NET desktop development workload, or the .NET 8 SDK.
+- Restore the NuGet packages and build the solution.
 - Press run!
 
 ## Installer 
