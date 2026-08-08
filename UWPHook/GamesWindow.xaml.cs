@@ -335,9 +335,10 @@ namespace UWPHook
                 Log.Error(exception.Message);
             }
 
-            if (games != null)
+            if (games != null && games.Length > 0)
             {
-                var game = games[0];
+                var game = games.FirstOrDefault(candidate =>
+                    String.Equals(candidate.Name, appName, StringComparison.OrdinalIgnoreCase)) ?? games[0];
                 Log.Verbose("Detected Game: " + game.ToString());
                 UInt64 gameId = GenerateSteamGridAppId(appName, appTarget);
 

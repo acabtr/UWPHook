@@ -34,7 +34,7 @@ namespace UWPHook.SteamGridDb
         /// <returns>Array of games corresponding to the provided name</returns>
         public async Task<GameResponse[]> SearchGame(string gameName)
         {
-            string path = $"search/autocomplete/{gameName}";
+            string path = $"search/autocomplete/{Uri.EscapeDataString(gameName)}";
 
             GameResponse[] games = null;
             HttpResponseMessage response = await httpClient.GetAsync(path);
