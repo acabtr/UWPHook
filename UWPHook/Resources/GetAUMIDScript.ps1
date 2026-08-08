@@ -13,8 +13,10 @@ foreach ($app in $installedapps)
                     $executable = $appx.Package.Applications.Application.Executable;
 
                     # Handle app running with microsoft launcher or which doesn't have an executable in the manifest
+                    $isXboxGame = Test-Path -Path ($app.InstallLocation + "\MicrosoftGame.Config");
+
                     if([string]::IsNullOrWhitespace($executable) -or $executable -eq "GameLaunchHelper.exe") {
-                        if(Test-Path -Path ($app.InstallLocation + "\MicrosoftGame.Config")) {
+                        if($isXboxGame) {
                             [xml]$msconfig = Get-Content ($app.InstallLocation + "\MicrosoftGame.Config");
                             $executable = $msconfig.Game.ExecutableList.Executable.Name;
                         }
@@ -48,7 +50,7 @@ foreach ($app in $installedapps)
 
                     # Insert if not duplicated
                     if(!$duplicate) {
-                        $aumidList += $name + "|" + $logo + "|" + $app.packagefamilyname + "!" + $id + "|" + $executable + ";"
+                        $aumidList += $name + "|" + $logo + "|" + $app.packagefamilyname + "!" + $id + "|" + $executable + "|" + $isXboxGame + ";"
                     }
                 }
             }

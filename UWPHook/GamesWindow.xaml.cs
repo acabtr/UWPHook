@@ -56,13 +56,29 @@ namespace UWPHook
             // If null or 1, the app was launched normally
             if (args?.Length > 1)
             {
-                // When length is 1, the only argument is the path where the app is installed
-                _ = LauncherAsync(args); // Launches the requested game
+                if (args.Any(arg => arg.Equals("--sync-xbox", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _ = SyncXboxGamesAsync(false, true);
+                }
+                else
+                {
+                    // When length is 1, the only argument is the path where the app is installed
+                    _ = LauncherAsync(args); // Launches the requested game
+                }
             }
             else
             {
-                //auto refresh on load
-                LoadButton_Click(null, null);
+                autoSyncXboxGamesCheckBox.IsChecked = Settings.Default.AutoSyncXboxGames;
+
+                if (Settings.Default.AutoSyncXboxGames)
+                {
+                    _ = SyncXboxGamesAsync(false, false);
+                }
+                else
+                {
+                    //auto refresh on load
+                    LoadButton_Click(null, null);
+                }
             }
         }
 
@@ -190,8 +206,11 @@ namespace UWPHook
 
             try
             {
-                await ExportGames();
-                await RestartSteam(restartSteam);
+                result = await ExportGames(Apps.Entries.Where(app => app.Selected));
+                if (result)
+                {
+                    await RestartSteam(restartSteam);
+                }
 
                 msg = "Your apps were successfuly exported!";
                 if (!restartSteam)
@@ -214,6 +233,17 @@ namespace UWPHook
             progressBar.Visibility = Visibility.Collapsed;
 
             MessageBox.Show(msg, "UWPHook", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private async void SyncXboxGamesButton_Click(object sender, RoutedEventArgs e)
+        {
+            await SyncXboxGamesAsync(true, false);
+        }
+
+        private void AutoSyncXboxGamesCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.AutoSyncXboxGames = autoSyncXboxGamesCheckBox.IsChecked == true;
+            Settings.Default.Save();
         }
 
         /// <summary>
@@ -394,15 +424,16 @@ namespace UWPHook
         /// </summary>
         /// <param name="restartSteam"></param>
         /// <returns></returns>
-        private async Task<bool> ExportGames()
+        private async Task<bool> ExportGames(IEnumerable<AppEntry> appsToExport, ISet<string>? installedAppAumids = null)
         {
             string[] tags = Settings.Default.Tags.Split(',');
             string steam_folder = SteamManager.GetSteamFolder();
+            bool shortcutsChanged = false;
 
             if (Directory.Exists(steam_folder))
             {
                 var users = SteamManager.GetUsers(steam_folder);
-                var selected_apps = Apps.Entries.Where(app => app.Selected);
+                var selected_apps = appsToExport.ToList();
                 var processModule = Process.GetCurrentProcess().MainModule;
                 var exePath = processModule?.FileName;
                 var exeDir = Path.GetDirectoryName(exePath);
@@ -449,6 +480,28 @@ namespace UWPHook
 
                         if (shortcuts != null)
                         {
+                            bool userShortcutsChanged = false;
+
+                            if (installedAppAumids != null)
+                            {
+                                var retainedShortcuts = shortcuts
+                                    .Where(shortcut => !IsUninstalledUWPHookApp(shortcut, exePath, installedAppAumids))
+                                    .ToArray();
+
+                                if (retainedShortcuts.Length != shortcuts.Length)
+                                {
+                                    Log.Information($"Removing {shortcuts.Length - retainedShortcuts.Length} uninstalled app shortcut(s) for Steam user {user}.");
+                                    shortcuts = retainedShortcuts;
+
+                                    for (int i = 0; i < shortcuts.Length; i++)
+                                    {
+                                        shortcuts[i].Index = i;
+                                    }
+
+                                    userShortcutsChanged = true;
+                                }
+                            }
+
                             foreach (var app in selected_apps)
                             {
                                 try
@@ -500,8 +553,14 @@ namespace UWPHook
                                     if (shortcuts[i].AppName == app.Name && shortcuts[i].Exe == exePath)
                                     {
                                         shortcutAlreadyExists = true;
-                                        Log.Verbose(app.Name + " already added to Steam. Updating existing shortcut.");
-                                        shortcuts[i] = newApp;
+                                        newApp.Index = shortcuts[i].Index;
+
+                                        if (!IsSameSteamShortcut(shortcuts[i], newApp))
+                                        {
+                                            Log.Verbose(app.Name + " already added to Steam. Updating existing shortcut.");
+                                            shortcuts[i] = newApp;
+                                            userShortcutsChanged = true;
+                                        }
                                     }
                                 }
 
@@ -510,7 +569,13 @@ namespace UWPHook
                                     //Resize this array so it fits the new entries
                                     Array.Resize(ref shortcuts, shortcuts.Length + 1);
                                     shortcuts[shortcuts.Length - 1] = newApp;
+                                    userShortcutsChanged = true;
                                 }
+                            }
+
+                            if (!userShortcutsChanged)
+                            {
+                                continue;
                             }
 
                             try
@@ -524,6 +589,7 @@ namespace UWPHook
 
                                 //Write the file with all the shortcuts
                                 File.WriteAllBytes(user + @"\\config\\shortcuts.vdf", VDFSerializer.Serialize(shortcuts));
+                                shortcutsChanged = true;
                                 Log.Debug("Shortcuts written to " + user + @"\\config\\shortcuts.vdf");
                             }
                             catch (Exception ex)
@@ -556,7 +622,44 @@ namespace UWPHook
                 }
             }
 
-            return true;
+            return shortcutsChanged;
+        }
+
+        private bool IsUninstalledUWPHookApp(VDFEntry shortcut, string uwpHookExePath, ISet<string> installedAppAumids)
+        {
+            if (!String.Equals(shortcut.Exe, uwpHookExePath, StringComparison.OrdinalIgnoreCase)
+                || String.IsNullOrWhiteSpace(shortcut.LaunchOptions))
+            {
+                return false;
+            }
+
+            string? aumid = shortcut.LaunchOptions
+                .Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault()
+                ?.Trim('"');
+
+            return !String.IsNullOrWhiteSpace(aumid)
+                && aumid.Contains("!")
+                && !installedAppAumids.Contains(aumid);
+        }
+
+        private bool IsSameSteamShortcut(VDFEntry existing, VDFEntry updated)
+        {
+            return existing.appid == updated.appid
+                && existing.AppName == updated.AppName
+                && existing.Exe == updated.Exe
+                && existing.StartDir == updated.StartDir
+                && existing.LaunchOptions == updated.LaunchOptions
+                && existing.AllowDesktopConfig == updated.AllowDesktopConfig
+                && existing.AllowOverlay == updated.AllowOverlay
+                && existing.Icon == updated.Icon
+                && existing.Index == updated.Index
+                && existing.IsHidden == updated.IsHidden
+                && existing.OpenVR == updated.OpenVR
+                && existing.ShortcutPath == updated.ShortcutPath
+                && existing.Devkit == updated.Devkit
+                && existing.DevkitGameID == updated.DevkitGameID
+                && Enumerable.SequenceEqual(existing.Tags ?? new string[0], updated.Tags ?? new string[0]);
         }
 
         private void BackupShortcutsVDF(string userPath, string vdfSubPath)
@@ -718,6 +821,69 @@ namespace UWPHook
             }
         }
 
+        private async Task SyncXboxGamesAsync(bool showCompletion, bool closeWhenFinished)
+        {
+            grid.IsEnabled = false;
+            label.Content = "Syncing Xbox games to Steam";
+            progressBar.Visibility = Visibility.Visible;
+
+            try
+            {
+                var entries = await Task.Run(() => GetInstalledAppEntries());
+                Apps.Entries = new System.Collections.ObjectModel.ObservableCollection<AppEntry>(entries);
+                listGames.ItemsSource = Apps.Entries;
+
+                var xboxGames = Apps.Entries.Where(app => app.IsXboxGame).ToList();
+                var installedAppAumids = new HashSet<string>(
+                    Apps.Entries.Select(app => app.Aumid),
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (var app in Apps.Entries)
+                {
+                    app.Selected = app.IsXboxGame;
+                }
+
+                bool changed = await ExportGames(xboxGames, installedAppAumids);
+                if (changed)
+                {
+                    await RestartSteam(true);
+                }
+
+                if (showCompletion)
+                {
+                    string message = changed
+                        ? $"Xbox games were synced to Steam. {xboxGames.Count} installed game(s) found."
+                        : xboxGames.Count == 0
+                            ? "No installed Xbox games were found, and Steam has no stale UWPHook shortcuts."
+                            : "Xbox games are already synced to Steam.";
+                    MessageBox.Show(message, "UWPHook", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (TaskCanceledException exception)
+            {
+                Log.Error(exception.Message);
+                if (showCompletion)
+                {
+                    MessageBox.Show(exception.Message, "UWPHook", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Error syncing Xbox games:" + Environment.NewLine + ex.Message + ex.StackTrace);
+                MessageBox.Show("Error syncing Xbox games:" + Environment.NewLine + ex.Message, "UWPHook", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                grid.IsEnabled = true;
+                progressBar.Visibility = Visibility.Collapsed;
+                label.Content = "Installed Apps";
+
+                if (closeWhenFinished)
+                {
+                    Close();
+                }
+            }
+        }
+
         /// <summary>
         /// Fires the Bwr_DoWork, to load the apps installed at the machine
         /// </summary>
@@ -745,10 +911,23 @@ namespace UWPHook
         /// <param name="e"></param>
         private void Bwr_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            if (e.Error != null)
+            {
+                Log.Error(e.Error.Message);
+                MessageBox.Show(e.Error.Message, "UWPHook", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            else if (e.Result is IEnumerable<AppEntry> entries)
+            {
+                Apps.Entries = new System.Collections.ObjectModel.ObservableCollection<AppEntry>(entries);
+            }
+
             listGames.ItemsSource = Apps.Entries;
 
-            listGames.Columns[2].IsReadOnly = true;
-            listGames.Columns[3].IsReadOnly = true;
+            if (listGames.Columns.Count > 3)
+            {
+                listGames.Columns[2].IsReadOnly = true;
+                listGames.Columns[3].IsReadOnly = true;
+            }
 
             grid.IsEnabled = true;
             progressBar.Visibility = Visibility.Collapsed;
@@ -761,6 +940,11 @@ namespace UWPHook
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void Bwr_DoWork(object sender, DoWorkEventArgs e)
+        {
+            e.Result = GetInstalledAppEntries();
+        }
+
+        private List<AppEntry> GetInstalledAppEntries()
         {
             try
             {
@@ -782,6 +966,8 @@ namespace UWPHook
                 //Rejoin them in the original list, but putting them into last
                 installedApps = installedApps.Union(nameNotFound).ToList<String>();
 
+                List<AppEntry> entries = new List<AppEntry>();
+
                 foreach (var app in installedApps)
                 {
                     //Remove end lines from the String and split both values, I split the appname and the AUMID using |
@@ -797,17 +983,17 @@ namespace UWPHook
                     {
                         //We get the default square tile to find where the app stores it's icons, then we resolve which one is the widest
                         string logosPath = Path.GetDirectoryName(values[1]);
-                        Application.Current.Dispatcher.BeginInvoke((Action)delegate ()
-                        {
-                            Apps.Entries.Add(new AppEntry() { Name = values[0], Executable = values[3], IconPath = logosPath, Aumid = values[2], Selected = false });
-                        });
+                        bool isXboxGame = values.Length >= 5 && bool.TryParse(values[4], out bool parsedIsXboxGame) && parsedIsXboxGame;
+                        entries.Add(new AppEntry() { Name = values[0], Executable = values[3], IconPath = logosPath, Aumid = values[2], Selected = false, IsXboxGame = isXboxGame });
                     }
                 }
+
+                return entries;
             }
             catch (Exception ex)
             {
                 Log.Error(ex.Message);
-                MessageBox.Show(ex.Message, "UWPHook", MessageBoxButton.OK, MessageBoxImage.Error);
+                throw;
             }
         }
 

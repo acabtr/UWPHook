@@ -78,6 +78,8 @@ namespace UWPHook
             set { _icon_path = value; }
         }
 
+        public bool IsXboxGame;
+
         public string widestSquareIcon()
         {
             string result = "";

@@ -270,5 +270,17 @@ namespace UWPHook.Properties {
                 this["TargetResolution"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AutoSyncXboxGames {
+            get {
+                return ((bool)(this["AutoSyncXboxGames"]));
+            }
+            set {
+                this["AutoSyncXboxGames"] = value;
+            }
+        }
     }
 }
